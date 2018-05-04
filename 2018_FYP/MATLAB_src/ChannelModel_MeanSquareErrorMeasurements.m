@@ -118,9 +118,15 @@ for i = 1:max(floor(n_max/SymbolsPerFrame),1)
 end
 plot(J_vec);
 title("Mean square error vs training symbols");
+ylabel("Mean square error");
+xlabel("training symbols");
 figure();
 plot(D_vec);
 title("Mean square deviation vs training symbols");
+ylabel("Mean square deviation");
+xlabel("training symbols");
 figure();
 plot(JE_vec);
 title("Excess mean square error vs training symbols");
+ylabel("Excess mean square error");
+xlabel("training symbols");
