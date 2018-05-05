@@ -189,10 +189,27 @@ addpath('functions');
 % isequal(dataOut, x1)
 
 %% Rayleigh fading model
+% Defining some useful variables
+FFTLength = 2^8;
+SymbolsPerFrame = 31;
+BitsPerSymbol = 2;
+frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
 
+% QPSK modulation
 QPSKmod = comm.QPSKModulator('BitInput', true);
 qpskDemod = comm.QPSKDemodulator('BitOutput',true);
 
+% OFDM Modulation
+ofdmQpskMod = comm.OFDMModulator( ...
+    'FFTLength',            FFTLength, ...
+    'NumGuardBandCarriers', [0;0], ...
+    'InsertDCNull',         false, ...
+    'PilotInputPort',       false, ...
+    'CyclicPrefixLength',   12, ...
+    'NumSymbols',           SymbolsPerFrame, ...
+    'NumTransmitAntennas',  1);
+
+ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
 
 pathDelays = [0 0.1 0.3 0.5 0.7 1.0 1.3 15.0 15.2 15.7 17.2 20.0].*1e-6;
 pathGains = [-10.0 -8.0 -6.0 -4.0 0.0 0.0 -4.0 -8.0 -9.0 -10.0 -12.0 -14.0];
@@ -201,16 +218,23 @@ rayleighChan = comm.RayleighChannel( ...
         'AveragePathGains', pathGains, ...
         'PathGainsOutputPort', true, ...
         'MaximumDopplerShift', 0.5, ...
-        'SampleRate', 200e3, ...
+        'SampleRate', 1.4e6, ...
         'DopplerSpectrum', {doppler('Jakes'), doppler('Jakes'), doppler('Jakes')...
         , doppler('Jakes'), doppler('Jakes'), doppler('Jakes'), doppler('Jakes')...
         , doppler('Jakes'), doppler('Jakes'), doppler('Jakes'), doppler('Jakes')...
         , doppler('Jakes')});
     
-Tx = QPSKmod(randi([0 1], 2048, 1));
+% rayleighChan.Visualization = 'Impulse and frequency responses';
+% rayleighChan.SamplesToDisplay = '100%';
+    
+x1=newRandomBinaryFrame(frameSize);
+   
+Tx = reshape(QPSKmod(x1), [FFTLength,SymbolsPerFrame]);
+Tx = ofdmQpskMod(Tx);
 for i = 1:15
     [Tx_rayleigh, pathGains] = rayleighChan(Tx);
-    scatterplot(Tx_rayleigh);
+    Rx = reshape(ofdm4QAMDemod(Tx_rayleigh), [FFTLength*SymbolsPerFrame 1]);
+    scatterplot(Rx);
 end
 
 
