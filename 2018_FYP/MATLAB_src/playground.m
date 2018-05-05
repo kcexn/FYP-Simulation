@@ -232,10 +232,13 @@ x1=newRandomBinaryFrame(frameSize);
 Tx = reshape(QPSKmod(x1), [FFTLength,SymbolsPerFrame]);
 Tx = ofdmQpskMod(Tx);
 for i = 1:15
-    [Tx_rayleigh, pathGains] = rayleighChan(Tx);
+    [Tx_rayleigh, pathGains] = rayleighChan(Tx); 
     Rx = reshape(ofdm4QAMDemod(Tx_rayleigh), [FFTLength*SymbolsPerFrame 1]);
-    scatterplot(Rx);
+%     figure();
+%     scatter(real(Rx), imag(Rx),'+', 'MarkerEdgeColor', [1, 209/255, 220/255]);
+%     axis([-2.1 2.1 -2.1 2.1]);
+%     xlabel("In Phase");
+%     ylabel("Quadrature");
+%     title("Scatterplot");
+    scatterplot(Rx, [], [], 'r+');
 end
-
-
-
