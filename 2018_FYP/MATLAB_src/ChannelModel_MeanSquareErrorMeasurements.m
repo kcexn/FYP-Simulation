@@ -10,6 +10,7 @@ SymbolsPerFrame = 5;
 BitsPerSymbol = 2;
 
 muVec = [0.01, 0.05, 0.1, 0.2, 0.35];
+% muVec = [0.001, 0.01, 0.02, 0.03, 0.04];
 
 EbNoVec = (0:13)';
 frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
@@ -53,7 +54,8 @@ snr = EbNoVec(11) + 10*log10(2);
 
     % Generate 64 realizations of a sing,le tap gain for
     % ensemble averaging
-w = randn + 1i*randn;
+w = (randn + 1i*randn);
+% W = randn(FFTLength, 1) + 1i.*randn(FFTLength,1);
 for i = 1:FFTLength
     W(i,1) = w;
 end
@@ -109,6 +111,7 @@ for k = 1:length(muVec)
     for i = 1:max(floor(n_max/SymbolsPerFrame),1)
         for j = 1:SymbolsPerFrame
             e(:,j) = knownOFDM(:,j) - conj(H_hat).*equalisedOFDM(:,j);
+%             H_hat = H_hat + (0.5./(0.5+abs(equalisedOFDM(:,j)).^2)).*equalisedOFDM(:,j).*conj(e(:,j));
             H_hat = H_hat + mu.*equalisedOFDM(:,j).*conj(e(:,j));
 
             error(:,j) = knownOFDM(:,j) - equalisedOFDM(:,j)./W;

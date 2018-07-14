@@ -1,6 +1,9 @@
 clear
 clc
 addpath('functions');
+s = RandStream('mt19937ar', 'Seed', 73);
+RandStream.setGlobalStream(s);
+s.reset;
 %% Test script for learning about MATLAB functions
 % % pnSequence
 %     pnSequenceQPSK = comm.PNSequence( ...
@@ -189,92 +192,153 @@ addpath('functions');
 % isequal(dataOut, x1)
 
 %% Rayleigh fading model
-% % Defining some useful variables
-% FFTLength = 64;
-% CPLength = 4;
-% SymbolsPerFrame = 64;
-% BitsPerSymbol = 2;
-% frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
+% Defining some useful variables
+FFTLength = 64;
+CPLength = 4;
+SymbolsPerFrame = 64;
+BitsPerSymbol = 2;
+frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
+
+% QPSK modulation
+QPSKmod = comm.QPSKModulator('BitInput', true);
+qpskDemod = comm.QPSKDemodulator('BitOutput',true);
+
+% OFDM Modulation
+ofdmQpskMod = comm.OFDMModulator( ...
+    'FFTLength',            FFTLength, ...
+    'NumGuardBandCarriers', [0;0], ...
+    'InsertDCNull',         false, ...
+    'PilotInputPort',       false, ...
+    'CyclicPrefixLength',   CPLength, ...
+    'NumSymbols',           SymbolsPerFrame, ...
+    'NumTransmitAntennas',  1);
+
+ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
+
+B = 1.4e6;
+T = 1/B; % Sample period
+Ts = T * (FFTLength + CPLength); %Symbol period.
+
+% Fading parameters
+A = -20; % difference between maximum and negligible path power. dB
+A_linear = 10^(A/10);
+tau_d = 0.75*T; % RMS delay spread
+T_m = -tau_d*log(A_linear); % Maximum delay spread. s
+f_0 = 1/T_m; % coherence bandwidth. Hz
+
+C = physconst('light'); %ms
+f0 = 1e9; %hz
+v = 0.0000001; %ms
+fd = v/(C/f0); %Hz
+T_0 = 9/(16.*pi.*fd); %0.5 coherence time.[s]
+% T_0 = 1/fd; % coherence time. s
+% T_0 = 0.423/fd;
+
+
+pathDelays = [0,1,2].*T;
+p = (1./tau_d).*exp(-1.*pathDelays./tau_d);
+figure;
+stem(pathDelays, p);
+g = sqrt(T.^2.*p);
+% g = [1,0.82,0.67];
+pathGains = 10.*log10(g);
+rayChan = comm.RayleighChannel( ...
+        'PathDelays', pathDelays, ...
+        'AveragePathGains', pathGains, ...
+        'NormalizePathGains', true, ...
+        'PathGainsOutputPort', true, ...
+        'MaximumDopplerShift', fd, ...
+        'SampleRate', B, ...
+        'DopplerSpectrum', doppler('Jakes'), ...
+        'RandomStream', 'mt19937ar with seed', ...
+        'Seed', 73);
 % 
-% % QPSK modulation
-% QPSKmod = comm.QPSKModulator('BitInput', true);
-% qpskDemod = comm.QPSKDemodulator('BitOutput',true);
-% 
-% % OFDM Modulation
-% ofdmQpskMod = comm.OFDMModulator( ...
-%     'FFTLength',            FFTLength, ...
-%     'NumGuardBandCarriers', [0;0], ...
-%     'InsertDCNull',         false, ...
-%     'PilotInputPort',       false, ...
-%     'CyclicPrefixLength',   CPLength, ...
-%     'NumSymbols',           SymbolsPerFrame, ...
-%     'NumTransmitAntennas',  1);
-% 
-% ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
-% 
-% B = 1.4e6;
-% T = 1/B; % Sample period
-% Ts = T * (FFTLength + CPLength); %Symbol period.
-% 
-% % Fading parameters
-% A = -20; % difference between maximum and negligible path power. dB
-% A_linear = 10^(A/10);
-% tau_d = 0.75*T; % RMS delay spread
-% T_m = -tau_d*log(A_linear); % Maximum delay spread. s
-% f_0 = 1/T_m; % coherence bandwidth. Hz
-% 
-% C = physconst('light'); %ms
-% f0 = 1e9; %hz
-% v = 100; %ms
-% fd = v/(C/f0); %Hz
-% T_0 = 9/(16.*pi.*fd); %0.5 coherence time.[s]
-% % T_0 = 1/fd; % coherence time. s
-% % T_0 = 0.423/fd;
-% 
-% 
-% pathDelays = [0,1,2].*T;
-% p = (1./tau_d).*exp(-1.*pathDelays./tau_d);
-% g = sqrt(T.^2.*p);
-% % g = [1,0.82,0.67];
-% pathGains = 10.*log10(g);
-% multipathChan = comm.RayleighChannel( ...
-%         'PathDelays', pathDelays, ...
-%         'AveragePathGains', pathGains, ...
-%         'NormalizePathGains', true, ...
-%         'PathGainsOutputPort', true, ...
-%         'MaximumDopplerShift', fd, ...
-%         'SampleRate', B, ...
-%         'DopplerSpectrum', doppler('Jakes'));
-% % 
-% % multipathChan=comm.RicianChannel( ...
-% %     'PathDelays', pathDelays, ...
-% %     'AveragePathGains', pathGains, ...
-% %     'NormalizePathGains', true, ...
-% %     'PathGainsOutputPort', true, ...
-% %     'MaximumDopplerShift', fd, ...
-% %     'KFactor', 3, ...
-% %     'DirectPathDopplerShift', 0, ...
-% %     'SampleRate', B, ...
-% %     'DopplerSpectrum', doppler('Jakes'));
-%     
+ricChan=comm.RicianChannel( ...
+    'PathDelays', pathDelays, ...
+    'AveragePathGains', pathGains, ...
+    'NormalizePathGains', true, ...
+    'PathGainsOutputPort', true, ...
+    'MaximumDopplerShift', fd, ...
+    'KFactor', 1, ...
+    'DirectPathDopplerShift', 0, ...
+    'SampleRate', B, ...
+    'DopplerSpectrum', doppler('Jakes'), ...
+    'RandomStream', 'mt19937ar with seed', ...
+    'Seed', 73);
+    
 % multipathChan.Visualization = 'Impulse and frequency responses';
 % multipathChan.SamplesToDisplay = '100%';
-% 
-% x1=newRandomBinaryFrame(frameSize);
-%    
-% Tx = reshape(QPSKmod(x1), [FFTLength,SymbolsPerFrame]);
-% Tx = ofdmQpskMod(Tx);
-% 
+
+gainScope = dsp.TimeScope( ...
+    'SampleRate', rayChan.SampleRate, ...
+    'TimeSpan', SymbolsPerFrame/rayChan.SampleRate, ...
+    'Name', 'Multipath Gain', ...
+    'ShowGrid', true, ... 
+    'YLimits', [-40, 10], ...
+    'YLabel', 'Gain (dB)');
+
+x1=newRandomBinaryFrame(frameSize);
+   
+Tx = reshape(QPSKmod(x1), [FFTLength,SymbolsPerFrame]);
+Tx = ofdmQpskMod(Tx);
+
+Tx_k = Tx./sqrt(var(Tx)).*sqrt(3*mean(g./max(g)));
+TxVar = var(Tx);
+
 % Out = [];
-% for i = 1:1
+Out = zeros(1, length(Tx));
+for i = 1:1
 %     [Tx_rayleigh, Taps] = multipathChan(Tx); 
 %     Rx = reshape(ofdm4QAMDemod(Tx_rayleigh), [FFTLength*SymbolsPerFrame 1]);
 %     scatterplot(Rx, [], [], 'r+');
-% end
+    [RayleighOut, rayPathGain] = rayChan(Tx);
+    % Rician Test?
+    In = zeros(1,3);
+    s.reset;
+    for j = 1:length(Tx)
+        if(j >= 3)
+            In(1) = Tx(j-2);
+        else
+            In(1) = 0;
+        end
+        if (j >= 2)
+            In(2) = Tx(j-1);
+        else
+            In(2) = 0;
+        end
+        In(3) = Tx(j);
+        RAND = randn(1,4);
+        % Rayleigh fading
+%         Out(j) = rayPathGain(j,3)*In(1) + rayPathGain(j,2)*In(2) + rayPathGain(j,1)*In(3);
+        % Rician Fading?
+        Out(j) = complex(0.8594,-0.1891)*Tx(j) + rayPathGain(j,3)*In(1) + rayPathGain(j,2)*In(2) + rayPathGain(j,1)*In(3);
+    end
+    Out = Out.';
+%     [~, rayPathGain] = ricChan(Tx);
+%     ricChan.reset;
+    [RicianOut, ricPathGain] = ricChan(Tx);
+end
+R = RicianOut-RayleighOut;
+% This changes with time where the doppler shift of the spectral components
+% influences it.
+Z = R./Tx;
+% X = sqrt(1.3331).*complex(randn,randn);
+PathGains = 10*log10(abs([rayPathGain(:,1), ricPathGain(:,1)].^2));
+% PathGains(:,1) = PathGains(:,1)-10*log10(abs(X).^2);
+gainScope(PathGains);
+
+RxRay = reshape(ofdm4QAMDemod(RayleighOut), [FFTLength*SymbolsPerFrame 1]);
+scatterplot(RxRay);
+RxVar = reshape(ofdm4QAMDemod(Out), [FFTLength*SymbolsPerFrame 1]);
+scatterplot(RxVar);
+RxRic = reshape(ofdm4QAMDemod(RicianOut), [FFTLength*SymbolsPerFrame 1]);
+scatterplot(RxRic);
+Y = abs(RxRic-RxVar);
+% gainScope(10*log10(abs([(rayPathGain(:,1)), ricPathGain(:,1)]).^2));
 % figure;
 % stem(pathDelays, mean(Taps.*conj(Taps)));
-% % % stem(pathDelays, mean(out));
-% % % stem(pathDelays, mean(Taps.*conj(Taps)));
+% % stem(pathDelays, mean(out));
+% % stem(pathDelays, mean(Taps.*conj(Taps)));
 %% MIMO-OFDM_Wireless_Communications_with_MATLAB Playground
 % fm = 100; scale = 1e-6; % Maximum Doppler frequency and mu
 % ts_mu = 50; ts = ts_mu*scale; fs = 1/ts; % Sampling time/ frequency

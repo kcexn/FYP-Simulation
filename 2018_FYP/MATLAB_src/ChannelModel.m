@@ -152,12 +152,13 @@ for k = 1:100
     qpskRx2 = reshape(ofdm4QAMDemod(equalisedOFDM), [1984 1]);
 %     qpskRx1 = reshape(ofdm4QAMDemod(qpsk_OFDM_Noise_Tx), [1984 1]);
     qpskRx1 = reshape(ofdm4QAMDemod(qpsk_OFDM_H_Noise_Tx), [1984 1]);
-    s = scatterplot(qpskRx1);
-    hold on
-    scatterplot(qpskRx2, [], [], 'rx', s);
+%     s = scatterplot(qpskRx1);
+%     hold on
+%     scatterplot(qpskRx2, [], [], 'rx', s);
+    scatterplot(qpskRx2);
     dataOut = qpskDemod(qpskRx1);
     dataOut2 = qpskDemod(qpskRx2);
-    hold off
+%     hold off
 
     cumulative_errors_noise_only = cumulative_errors_noise_only + length(dataOut(dataOut ~= x1));
     cumulative_errors = cumulative_errors + length(dataOut2(dataOut2 ~= x1));
