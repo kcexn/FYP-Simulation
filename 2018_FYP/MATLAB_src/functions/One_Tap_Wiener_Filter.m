@@ -10,8 +10,8 @@ function [Rx_f, W] = One_Tap_Wiener_Filter(Rx, Tx, Noiseless_Rx, noiseVar)
 
 % begin the function
 % Rx_f = zeros(size(Rx));
-% R = mean(Rx.*conj(Rx));
-R = mean(Noiseless_Rx.*conj(Noiseless_Rx))+ noiseVar;
+R = mean(Rx.*conj(Rx));
+% R = mean(Noiseless_Rx.*conj(Noiseless_Rx))+ noiseVar;
 P = Noiseless_Rx.*conj(Tx);
 W = inv(R).*P;
 Rx_f = conj(W).*Rx;

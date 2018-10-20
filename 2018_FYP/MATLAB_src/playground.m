@@ -37,201 +37,201 @@ s.reset;
 % plot(fVals, angle(X));
 %% OFDM
 % Transmission Parameters
-bw = 80e3; % 2 sided bandwidth
-fc = 2.45e9; % carrier frequency
-
-FFTLength = 2^6-1;
-CPLength = 1;
-SymbolsPerFrame = 1;
-BitsPerSymbol = 2;
-frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
-
-upSampleFactor = 1.5e2;
-fs = (FFTLength+1)*bw*upSampleFactor; % sampling frequency
-sampsPerSym = (fs/((FFTLength+1)*bw));    % Upsampling factor
-
-% % Transmission Parameters
-Ns = sampsPerSym*SymbolsPerFrame*(FFTLength+1+CPLength); % number of samples
-t = 0:1/fs:(Ns-1)/fs; % time vector
-
-% Raised Cosine Filter
-beta = 0.5;
-filterSpan = 6;
-
-% System Objects
-QPSKmod = comm.QPSKModulator('BitInput', true);
-qpskDemod = comm.QPSKDemodulator('BitOutput',true);
-
-% OFDM Modulation
-ofdmQpskMod = comm.OFDMModulator( ...
-    'FFTLength',            FFTLength+1, ...
-    'NumGuardBandCarriers', [0;0], ...
-    'InsertDCNull',         true, ...
-    'PilotInputPort',       false, ...
-    'CyclicPrefixLength',   CPLength, ...
-    'NumSymbols',           SymbolsPerFrame, ...
-    'NumTransmitAntennas',  1);
-ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
-
-rctFilt = comm.RaisedCosineTransmitFilter(...
-  'Shape',                  'Normal', ...
-  'RolloffFactor',          beta, ...
-  'FilterSpanInSymbols',    filterSpan, ...
-  'OutputSamplesPerSymbol', sampsPerSym);
-
-b = coeffs(rctFilt);
-rctFilt.Gain = 1/max(b.Numerator);
-
+% bw = 80e3; % 2 sided bandwidth
+% fc = 2.45e9; % carrier frequency
+% 
+% FFTLength = 2^6-1;
+% CPLength = 1;
+% SymbolsPerFrame = 1;
+% BitsPerSymbol = 2;
+% frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
+% 
+% upSampleFactor = 1.5e2;
+% fs = (FFTLength+1)*bw*upSampleFactor; % sampling frequency
+% sampsPerSym = (fs/((FFTLength+1)*bw));    % Upsampling factor
+% 
+% % % Transmission Parameters
+% Ns = sampsPerSym*SymbolsPerFrame*(FFTLength+1+CPLength); % number of samples
+% t = 0:1/fs:(Ns-1)/fs; % time vector
+% 
+% % Raised Cosine Filter
+% beta = 0.5;
+% filterSpan = 6;
+% 
+% % System Objects
+% QPSKmod = comm.QPSKModulator('BitInput', true);
+% qpskDemod = comm.QPSKDemodulator('BitOutput',true);
+% 
+% % OFDM Modulation
+% ofdmQpskMod = comm.OFDMModulator( ...
+%     'FFTLength',            FFTLength+1, ...
+%     'NumGuardBandCarriers', [0;0], ...
+%     'InsertDCNull',         true, ...
+%     'PilotInputPort',       false, ...
+%     'CyclicPrefixLength',   CPLength, ...
+%     'NumSymbols',           SymbolsPerFrame, ...
+%     'NumTransmitAntennas',  1);
+% ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
+% 
+% rctFilt = comm.RaisedCosineTransmitFilter(...
+%   'Shape',                  'Normal', ...
+%   'RolloffFactor',          beta, ...
+%   'FilterSpanInSymbols',    filterSpan, ...
+%   'OutputSamplesPerSymbol', sampsPerSym);
+% 
+% b = coeffs(rctFilt);
+% rctFilt.Gain = 1/max(b.Numerator);
+% 
+% % [b,a] = butter(3,2.5*((FFTLength+1)*bw)/fs);
+% 
+% x1 = newRandomBinaryFrame(frameSize);
+% x1QAM = QPSKmod(x1);
+% 
+% OFDM = ofdmQpskMod(x1QAM);
+% tmpOFDM = OFDM;
+% % tmpOFDM = zeros((FFTLength+1)*upSampleFactor,1);
+% % tmpOFDM(1:500:end) = tmpOFDM(1:500:end) + ofdmQpskMod(x1QAM);
+% OFDM = rectpulse(OFDM, upSampleFactor);
+% % OFDM = rctFilt([OFDM; zeros(filterSpan/2,1)]);
+% 
+% % FilterVsImpulse = figure();
+% % fltDelay = filterSpan/(2*(fs/upSampleFactor));
+% % t = 0:1/(fs/upSampleFactor):(length(tmpOFDM)-1)/(fs/upSampleFactor);
+% % stem(t,real(tmpOFDM));
+% % % hold on
+% % % t = (0:(FFTLength+1)*sampsPerSym-1)/(fs);
+% % % % t = 0:1/fs:((Ns+(filterSpan/2*upSampleFactor))-1)/fs; % time vector
+% % % xx = OFDM(fltDelay*(fs)+1:end);
+% % % plot(t,xx.');
+% 
+% 
+% % Rectangularly filtered freq response
+% BasebandFreqResponse = figure();
+% fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
+% R = fftshift(fft(OFDM, (FFTLength+1)*upSampleFactor));
+% plot(fVals, 10*log10((abs(R)./max(abs(R))).^2));
+% 
+% % cosine filtering
+% % t = 0:1/fs:((Ns+(filterSpan/2*upSampleFactor))-1)/fs; % time vector
+% 
+% TxOFDM_I = real(OFDM).*cos(2.*pi.*fc.*t.');
+% TxOFDM_Q = imag(OFDM).*cos(2.*pi.*fc.*t.');
+% 
+% TxOFDM = real(OFDM).*cos(2.*pi.*fc.*t.') + imag(OFDM).*sin(2.*pi.*fc.*t.');
+% 
+% % Mixed up filtered freq response
+% BandpassFreqResponse = figure();
+% fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
+% R = fftshift(fft(TxOFDM, (FFTLength+1)*upSampleFactor));
+% plot(fVals, 10*log10((abs(R)./max(abs(R))).^2));
+% 
+% RxOFDM_I = TxOFDM.*2.*cos(2.*pi.*fc.*t.');
+% RxOFDM_Q = TxOFDM.*2.*sin(2.*pi.*fc.*t.');
+% 
+% % Mixed down freq response
+% BasebandMixedFreqResponse = figure();
+% fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
+% R = fftshift(fft(complex(RxOFDM_I,RxOFDM_Q),(FFTLength+1)*upSampleFactor));
+% % plot(fVals, 10.*log10((abs(R)./max(abs(R))).^2));
+% RI = fftshift(fft(RxOFDM_I,(FFTLength+1)*upSampleFactor));
+% RQ = fftshift(fft(RxOFDM_Q, (FFTLength+1)*upSampleFactor));
+% subplot(2,1,1);
+% plot(fVals, 10.*log10((abs(RI)./max(abs(RI))).^2));
+% subplot(2,1,2);
+% plot(fVals, 10.*log10((abs(RQ)./max(abs(RQ))).^2));
+% 
 % [b,a] = butter(3,2.5*((FFTLength+1)*bw)/fs);
-
-x1 = newRandomBinaryFrame(frameSize);
-x1QAM = QPSKmod(x1);
-
-OFDM = ofdmQpskMod(x1QAM);
-tmpOFDM = OFDM;
-% tmpOFDM = zeros((FFTLength+1)*upSampleFactor,1);
-% tmpOFDM(1:500:end) = tmpOFDM(1:500:end) + ofdmQpskMod(x1QAM);
-OFDM = rectpulse(OFDM, upSampleFactor);
-% OFDM = rctFilt([OFDM; zeros(filterSpan/2,1)]);
-
-% FilterVsImpulse = figure();
-% fltDelay = filterSpan/(2*(fs/upSampleFactor));
-% t = 0:1/(fs/upSampleFactor):(length(tmpOFDM)-1)/(fs/upSampleFactor);
-% stem(t,real(tmpOFDM));
-% % hold on
-% % t = (0:(FFTLength+1)*sampsPerSym-1)/(fs);
-% % % t = 0:1/fs:((Ns+(filterSpan/2*upSampleFactor))-1)/fs; % time vector
-% % xx = OFDM(fltDelay*(fs)+1:end);
-% % plot(t,xx.');
-
-
-% Rectangularly filtered freq response
-BasebandFreqResponse = figure();
-fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
-R = fftshift(fft(OFDM, (FFTLength+1)*upSampleFactor));
-plot(fVals, 10*log10((abs(R)./max(abs(R))).^2));
-
-% cosine filtering
-% t = 0:1/fs:((Ns+(filterSpan/2*upSampleFactor))-1)/fs; % time vector
-
-TxOFDM_I = real(OFDM).*cos(2.*pi.*fc.*t.');
-TxOFDM_Q = imag(OFDM).*cos(2.*pi.*fc.*t.');
-
-TxOFDM = real(OFDM).*cos(2.*pi.*fc.*t.') + imag(OFDM).*sin(2.*pi.*fc.*t.');
-
-% Mixed up filtered freq response
-BandpassFreqResponse = figure();
-fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
-R = fftshift(fft(TxOFDM, (FFTLength+1)*upSampleFactor));
-plot(fVals, 10*log10((abs(R)./max(abs(R))).^2));
-
-RxOFDM_I = TxOFDM.*2.*cos(2.*pi.*fc.*t.');
-RxOFDM_Q = TxOFDM.*2.*sin(2.*pi.*fc.*t.');
-
-% Mixed down freq response
-BasebandMixedFreqResponse = figure();
-fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
-R = fftshift(fft(complex(RxOFDM_I,RxOFDM_Q),(FFTLength+1)*upSampleFactor));
-% plot(fVals, 10.*log10((abs(R)./max(abs(R))).^2));
-RI = fftshift(fft(RxOFDM_I,(FFTLength+1)*upSampleFactor));
-RQ = fftshift(fft(RxOFDM_Q, (FFTLength+1)*upSampleFactor));
-subplot(2,1,1);
-plot(fVals, 10.*log10((abs(RI)./max(abs(RI))).^2));
-subplot(2,1,2);
-plot(fVals, 10.*log10((abs(RQ)./max(abs(RQ))).^2));
-
-[b,a] = butter(3,2.5*((FFTLength+1)*bw)/fs);
-RxOFDM_I = filter(b,a, RxOFDM_I);
-RxOFDM_Q = filter(b,a, RxOFDM_Q);
-
-%Baseband filtered mixed freq response
-FilteredBasebandMixedFreqResponse = figure();
-fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
-RI = fftshift(fft(RxOFDM_I,(FFTLength+1)*upSampleFactor));
-RQ = fftshift(fft(RxOFDM_Q,(FFTLength+1)*upSampleFactor)); 
-subplot(3,1,1);
-plot(fVals, 10.*log10((abs(RI)./max(abs(RI))).^2));
-subplot(3,1,2);
-plot(fVals, 10.*log10((abs(RQ)./max(abs(RQ))).^2));
-subplot(3,1,3);
-R = fftshift(fft(complex(RxOFDM_I,RxOFDM_Q),(FFTLength+1)*upSampleFactor));
-plot(fVals, 10.*log10((abs(R)/max(abs(R))).^2));
-
-%Time-domain Response
-TimeDomainFilteredBaseband = figure();
-fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
-subplot(2,1,1);
-plot(real(OFDM));
-hold on
-plot(RxOFDM_I);
-subplot(2,1,2);
-plot(imag(OFDM));
-hold on
-plot(RxOFDM_Q);
-
-% Down sample
-
-% rectangular pulses
-rI = RxOFDM_I(upSampleFactor-5:upSampleFactor:end);
-rQ = RxOFDM_Q(upSampleFactor-5:upSampleFactor:end);
-
-%raised cosine filtering
-% rI = RxOFDM_I(fltDelay*(fs)+100:end);
-% rQ = RxOFDM_Q(fltDelay*(fs)+100:end);
-
-% plot(rI(1:upSampleFactor:end))
-
-% rectangular filtering
-rOFDM = complex(rI, rQ);
-
-% raised cosine filtering
-% rOFDM = complex(rI(1:upSampleFactor:end), rQ(1:upSampleFactor:end));
-
-rx = ofdm4QAMDemod(rOFDM);
-scatterplot(rx);
+% RxOFDM_I = filter(b,a, RxOFDM_I);
+% RxOFDM_Q = filter(b,a, RxOFDM_Q);
+% 
+% %Baseband filtered mixed freq response
+% FilteredBasebandMixedFreqResponse = figure();
+% fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
+% RI = fftshift(fft(RxOFDM_I,(FFTLength+1)*upSampleFactor));
+% RQ = fftshift(fft(RxOFDM_Q,(FFTLength+1)*upSampleFactor)); 
+% subplot(3,1,1);
+% plot(fVals, 10.*log10((abs(RI)./max(abs(RI))).^2));
+% subplot(3,1,2);
+% plot(fVals, 10.*log10((abs(RQ)./max(abs(RQ))).^2));
+% subplot(3,1,3);
+% R = fftshift(fft(complex(RxOFDM_I,RxOFDM_Q),(FFTLength+1)*upSampleFactor));
+% plot(fVals, 10.*log10((abs(R)/max(abs(R))).^2));
+% 
+% %Time-domain Response
+% TimeDomainFilteredBaseband = figure();
+% fVals = ((FFTLength+1)*bw*upSampleFactor)*(-((FFTLength+1)*upSampleFactor)/2:((FFTLength+1)*upSampleFactor-1)/2)/((FFTLength+1)*upSampleFactor);
+% subplot(2,1,1);
+% plot(real(OFDM));
+% hold on
+% plot(RxOFDM_I);
+% subplot(2,1,2);
+% plot(imag(OFDM));
+% hold on
+% plot(RxOFDM_Q);
+% 
+% % Down sample
+% 
+% % rectangular pulses
+% rI = RxOFDM_I(upSampleFactor-5:upSampleFactor:end);
+% rQ = RxOFDM_Q(upSampleFactor-5:upSampleFactor:end);
+% 
+% %raised cosine filtering
+% % rI = RxOFDM_I(fltDelay*(fs)+100:end);
+% % rQ = RxOFDM_Q(fltDelay*(fs)+100:end);
+% 
+% % plot(rI(1:upSampleFactor:end))
+% 
+% % rectangular filtering
+% rOFDM = complex(rI, rQ);
+% 
+% % raised cosine filtering
+% % rOFDM = complex(rI(1:upSampleFactor:end), rQ(1:upSampleFactor:end));
+% 
+% rx = ofdm4QAMDemod(rOFDM);
+% scatterplot(rx);
 
 %% Sum of Sinusoids approach to OFDM
-% zz = [ x1QAM(1:ceil(length(x1QAM)/2));
-%        0;
-%        x1QAM(ceil(length(x1QAM)/2)+1:end) ];
-% ZZ = ifft(ifftshift(zz),FFTLength+1);
-% ZZ = [ZZ(end-(CPLength-1):end);ZZ];
-% comp = [ZZ,tmpOFDM];
+% % zz = [ x1QAM(1:ceil(length(x1QAM)/2));
+% %        0;
+% %        x1QAM(ceil(length(x1QAM)/2)+1:end) ];
+% % ZZ = ifft(ifftshift(zz),FFTLength+1);
+% % ZZ = [ZZ(end-(CPLength-1):end);ZZ];
+% % comp = [ZZ,tmpOFDM];
+% % 
+% % ZR = fftshift(fft(ZZ(1+CPLength:end),FFTLength+1));
+% % R = fftshift(fft(tmpOFDM(1+CPLength:end),FFTLength+1));
+% % 
+% % compR = [zz,ZR,R];
 % 
-% ZR = fftshift(fft(ZZ(1+CPLength:end),FFTLength+1));
-% R = fftshift(fft(tmpOFDM(1+CPLength:end),FFTLength+1));
+% DCNulls = 16;
+% % -1 to accomodate for the fact that there is already an individual DCNULL
+% x2 = x1QAM(1:end-(DCNulls-1));
+% % establish the frequency domain frame
+% % +1 to account for the existing DCNULL in the OFDM system object
+% frame = ones(FFTLength+1,1);
+% for i = 0:DCNulls-1
+%    frame(length(frame)/2+1+ceil(i/2)*((-1)^(i+1))) = 0; 
+% end
 % 
-% compR = [zz,ZR,R];
-
-DCNulls = 16;
-% -1 to accomodate for the fact that there is already an individual DCNULL
-x2 = x1QAM(1:end-(DCNulls-1));
-% establish the frequency domain frame
-% +1 to account for the existing DCNULL in the OFDM system object
-frame = ones(FFTLength+1,1);
-for i = 0:DCNulls-1
-   frame(length(frame)/2+1+ceil(i/2)*((-1)^(i+1))) = 0; 
-end
-
-j = 1;
-for i = 1:length(frame)
-   if(frame(i) == 1)
-       frame(i) = x2(j);
-       j = j + 1;
-   end
-end
-
-figure();
-stem(abs(frame));
-
-% +1 to accomodate for DCNULL in the OFDM System object
-X = ifft(ifftshift(frame),FFTLength+1);
-R = fftshift(fft(X,FFTLength+1));
-
-comp = [frame,R];
-
-figure();
-stem(abs(R));
+% j = 1;
+% for i = 1:length(frame)
+%    if(frame(i) == 1)
+%        frame(i) = x2(j);
+%        j = j + 1;
+%    end
+% end
+% 
+% figure();
+% stem(abs(frame));
+% 
+% % +1 to accomodate for DCNULL in the OFDM System object
+% X = ifft(ifftshift(frame),FFTLength+1);
+% R = fftshift(fft(X,FFTLength+1));
+% 
+% comp = [frame,R];
+% 
+% figure();
+% stem(abs(R));
 
 %% Looking at Channel Tap Weight Time domain response.
 
@@ -607,48 +607,117 @@ stem(abs(R));
 % figure;
 % stem(pathDelays, mean(H.*conj(H)));
 
-%% Rician fading from scratch
-% B = 900e6;
-% Ts = 1/B;
-% n = 10000;
-% t = 0:Ts/100:Ts;
-% tau = 0.1.*Ts;
-% 
-% t_w = -10*Ts:Ts/2000000:10*Ts;
-% % psi_s = sqrt(1/Ts.*sqrt(2/Ts.*t_w));
-% % psi_r = sqrt(1/Ts.*sqrt(2/Ts.*t_w));
-% % W = psi_s.*psi_r;
-% 
-% psi_s = sinc((2/Ts).*t_w);
-% psi_r = sinc((2/Ts).*(t_w-0.1*Ts));
-% [W, Lags] = xcorr(psi_s);
-% % [W, Lags] = xcorr(psi_r,psi_s);
-% figure()
-% subplot(2,1,1)
-% plot(W);
-% subplot(2,1,2);
-% plot(t_w,psi_s);
+%% Rician Fading one tap
+%% Defining some useful variables
+%Constants
+C = physconst('light'); %ms
+
+% Modem variables
+M = 4; % M-QAM;
+FFTLength = 2^7;
+BitsPerSymbol = log2(M);
+SymbolsPerFrame = 120;
+% SymbolsPerFrame = round(1500*8/BitsPerSymbol/FFTLength); % Ethernet v2 MTU?
+CPLength = 56;
+frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
+NoOfFrames = 1;
+
+% Tranmission and Reception Variables
+f0 = 2.45e9; % Carrier frequency [Hz]
+v = 0.013; % UE velocity [m/s] (speed of a garden snail?)
+% v = 0;
+B = 0.5e6; % OFDM Symbol Bandwidth [Hz]
+T = 1/B; % Sample period [s]
+Ts = T * (FFTLength + CPLength); % OFDM Symbol Period [s]
+
+% Fading parameters
+A = -20; % difference between maximum and negligible path power. dB
+A_linear = 10^(A/10);
+tau_d = 0.75*T; % RMS delay spread
+T_m = -tau_d*log(A_linear); % Maximum delay spread. s
+f_0 = 1/T_m; % coherence bandwidth. Hz
+
+fd = v/(C/f0); % Doppler frequency [Hz]
+T_0 = 9/(16.*pi.*fd); % 0.5 coherence time.[s]
+
+pathDelays = [0,1,2].*T;
+p = (1./tau_d).*exp(-1.*pathDelays./tau_d);
+g = sqrt(T.^2.*p);
+pathGains = 10.*log10(g);
+%% Defining System Objects
+% QPSK modulation
+QPSKmod = comm.QPSKModulator('BitInput', true);
+qpskDemod = comm.QPSKDemodulator('BitOutput',true);
+
+% OFDM Modulation
+ofdmQpskMod = comm.OFDMModulator( ...
+    'FFTLength',            FFTLength, ...
+    'NumGuardBandCarriers', [0;0], ...
+    'InsertDCNull',         false, ...
+    'PilotInputPort',       false, ...
+    'CyclicPrefixLength',   CPLength, ...
+    'NumSymbols',           SymbolsPerFrame, ...
+    'NumTransmitAntennas',  1);
+ofdm4QAMDemod = comm.OFDMDemodulator(ofdmQpskMod);
+    
+ricChan=comm.RicianChannel( ...
+    'PathDelays', pathDelays, ...
+    'AveragePathGains', pathGains, ...
+    'NormalizePathGains', true, ...
+    'PathGainsOutputPort', true, ...
+    'MaximumDopplerShift', fd, ...
+    'KFactor', 3, ...
+    'DirectPathDopplerShift', 0, ...
+    'DirectPathInitialPhase', 0, ...
+    'SampleRate', B, ...
+    'DopplerSpectrum', doppler('Jakes'));   
+% ricChan.Visualizatoin = 'Frequency response';
+
+rayChan = comm.RayleighChannel( ...
+        'PathDelays', pathDelays, ...
+        'AveragePathGains', pathGains, ...
+        'NormalizePathGains', true, ...
+        'PathGainsOutputPort', true, ...
+        'MaximumDopplerShift', fd, ...
+        'SampleRate', B, ...
+        'DopplerSpectrum', doppler('Jakes'));
+% rayChan.Visualization = 'Frequency response';
+
+awgnChannel = comm.AWGNChannel( ...
+    'NoiseMethod', 'Variance', ...
+    'VarianceSource', 'Input port');
+
+% multipathChan = ricChan;
+multipathChan = rayChan;
+
+x1=newRandomBinaryFrame(frameSize);
+Tx_QPSK = reshape(QPSKmod(x1), [FFTLength,SymbolsPerFrame]);
+Tx = ofdmQpskMod(Tx_QPSK);
+
+powerdB = 10.*log10(var(Tx));
+snr = 10 + 10*log10(log2(M));
+noiseVar = 10^(0.1*(powerdB-snr));
+
+[TxMultipath, multipathTaps] = multipathChan(Tx);
+
+TxNoiselessMultipath = TxMultipath;
+TxMultipath = awgnChannel(TxMultipath,noiseVar);
 
 
 
+Rx = ofdm4QAMDemod(TxMultipath);
+NoiselessRx = ofdm4QAMDemod(TxNoiselessMultipath);
+scatterplot(reshape(Rx,[FFTLength*SymbolsPerFrame,1]));
 
-% [W, Lags] = xcorr(psi_s, psi_r);
-% W = 1/Ts*(sum(psi_s.*psi_r));
-% W = Ts^2*sum(psi_s.*psi_r);
+FilterLength = 11;
+H_hat = zeros(FFTLength,FilterLength);
+for j = 1:size(Rx,1)
+    [~, H_hat(j,:)] = ...
+        One_Tap_Wiener_Filter(Rx(j,1:FilterLength), ...
+        Tx_QPSK(j,1:FilterLength), ...
+        NoiselessRx(j,1:FilterLength));
+end
+H_hat = mean(H_hat,2);
 
-
-% W = mean(W);
-% W_0 = psi_s.*psi_r;
-% W_0 = mean(W_0);
-
-
-
-
-
-% psi_r = sqrt(2/Ts).*sinc((2/Ts).*(t-0.1*Ts));
-% psi_s = sqrt(2/Ts).*sinc((2/Ts).*(t));
-% W = sum(psi_r(t,Ts,tau).*conj(psi_s(t,Ts,0)));
-
-
-
-
+csvwrite('multipathTaps.csv',multipathTaps);
+csvwrite('InitialWienerFilter.csv',H_hat);

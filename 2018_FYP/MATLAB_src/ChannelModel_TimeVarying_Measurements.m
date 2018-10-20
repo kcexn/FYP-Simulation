@@ -8,38 +8,31 @@ C = physconst('light'); %ms
 
 % Modem variables
 M = 4; % M-QAM;
-FFTLength = 2^8;
+FFTLength = 2^7;
 BitsPerSymbol = log2(M);
-SymbolsPerFrame = 100;
-% SymbolsPerFrame = round(1500*8/BitsPerSymbol/FFTLength); % Ethernet v2 MTU?
-CPLength = 60;
+SymbolsPerFrame = 1000;
+CPLength = 56;
 frameSize = FFTLength*SymbolsPerFrame*BitsPerSymbol;
 NoOfFrames = 1;
 
 % Tranmission and Reception Variables
 f0 = 2.45e9; % Carrier frequency [Hz]
 v = 0.013; % UE velocity [m/s] (speed of a garden snail?)
-% v = 0;
 B = 0.5e6; % OFDM Symbol Bandwidth [Hz]
 T = 1/B; % Sample period [s]
 Ts = T * (FFTLength + CPLength); % OFDM Symbol Period [s]
 
 % Equalisation variables
-mu = 0.1;
-% mu = 0.5;
-H_hat = zeros(FFTLength,1);
+muLMS = 0.1;
+muNLMS = 0.5;
 decision_directed = false;
-training_symbols = SymbolsPerFrame;
-% training_symbols = 20;
+% training_symbols = SymbolsPerFrame;
+training_symbols = 200;
+% training_symbols = 1;
 NLMS_Numerical_Conditioning_Constant = 0.005;
-% NLMS_Numerical_Conditioning_Constant = 4;
 
 % Wireless Channel Variables
-% EbNoVec = (10:1:30)';
-EbNoVec = [16,18,20,22,24,26,28];
-% EbNoVec = [15,12,14,16,18,20];
-EbNo = 22;
-snr = EbNo + 10*log10(BitsPerSymbol);
+EbNoVec = [30,18,21,24];
 
 % Fading parameters
 A = -20; % difference between maximum and negligible path power. dB
@@ -57,7 +50,7 @@ g = sqrt(T.^2.*p);
 pathGains = 10.*log10(g);
 
 %Simulation Measurement variables
-NoOfRealisations = 500;
+NoOfRealisations = 100;
 MeanSquareError = zeros(FFTLength, SymbolsPerFrame, NoOfRealisations);
 berTmpVec = zeros(length(EbNoVec), NoOfRealisations, NoOfFrames);
 
@@ -66,6 +59,7 @@ WienerRx = zeros(FFTLength, SymbolsPerFrame);
 WienerFilterCoeff = zeros(FFTLength,SymbolsPerFrame);
 WienerError = zeros(FFTLength, SymbolsPerFrame, NoOfRealisations);
 WienerMSE = zeros(FFTLength);
+WienerBERTmpVec = zeros(length(EbNoVec), NoOfRealisations, NoOfFrames);
 %% Defining System Objects
 % QPSK modulation
 QPSKmod = comm.QPSKModulator('BitInput', true);
@@ -91,7 +85,7 @@ rayChan = comm.RayleighChannel( ...
         'SampleRate', B, ...
         'DopplerSpectrum', doppler('Jakes'));
     
-% rayChan.Visualization = 'Frequency response';
+% rayChan.Visualization = 'Impulse response';
 % AWGN Channel
 awgnChannel = comm.AWGNChannel( ...
     'NoiseMethod', 'Variance', ...
@@ -105,12 +99,13 @@ ricChan=comm.RicianChannel( ...
     'MaximumDopplerShift', fd, ...
     'KFactor', 3, ...
     'DirectPathDopplerShift', 0, ...
+    'DirectPathInitialPhase', 0, ...
     'SampleRate', B, ...
     'DopplerSpectrum', doppler('Jakes'));   
 % ricChan.Visualization = 'Frequency response';
 
-% multipathChan = rayChan;
-multipathChan = ricChan;
+multipathChan = rayChan;
+% multipathChan = ricChan;
 
 % gainScope = dsp.TimeScope( ...
 %     'SampleRate', multipathChan.SampleRate, ...
@@ -124,14 +119,12 @@ multipathChan = ricChan;
 % Simulation
 % MSE_flag for toggling between mean square error and bit error rate
 % plots
-MSE_flag = 0;
+MSE_flag = 1;
 if (MSE_flag == 1)
     M = 1;
 else
     M = length(EbNoVec);
 end
-
-
 
 for m = 1:M
     for k = 1:NoOfRealisations
@@ -143,70 +136,69 @@ for m = 1:M
             Tx = ofdmQpskMod(Tx_QPSK);
 
             % AWGN channel system variables       
-            snr = EbNoVec(m) + 10*log10(BitsPerSymbol); % Only when sweeping through SNR's
+            snr = EbNoVec(m) + 10*log10(BitsPerSymbol);
             powerDB = 10*log10(var(Tx));
             noiseVar = 10.^(0.1*(powerDB-snr));
 
             [TxMultipath, multipathTaps] = multipathChan(Tx);
-%             if ( k == NoOfRealisations)
-                Noiseless_Rx = ofdm4QAMDemod(TxMultipath);
-%             end
+            Noiseless_Rx = ofdm4QAMDemod(TxMultipath);
             TxMultipath = awgnChannel(TxMultipath, noiseVar);
             Rx = ofdm4QAMDemod(TxMultipath);
-%             if ( k == NoOfRealisations)
-%                 WienerRx = zeros(size(Rx));
-%                 WienerFilterCoeff = zeros(size(Rx,1));
-%                 WienerError = zeros(size(Rx));
-%                 WienerMSE = zeros(FFTLength);
-                if ( MSE_flag == 1 )
-                    for j = 1:size(Rx,1)
-                        [WienerRx(j,:), WienerFilterCoeff(j,:)] = One_Tap_Wiener_Filter(Rx(j,:), Tx_QPSK(j,:), Noiseless_Rx(j,:), noiseVar);
-                        WienerError(j,:,k) = WienerRx(j,:)-Tx_QPSK(j,:);
+            
+            T0TsRatioOrderOfMagnitude = floor(log10(T_0/Ts));
+            FilterLength = 1*10^(T0TsRatioOrderOfMagnitude-1);
+            for l = 1:(SymbolsPerFrame/FilterLength)
+                for j = 1:size(Rx,1)
+                    [WienerRx(j,(l-1)*FilterLength+1:l*FilterLength), ...
+                        WienerFilterCoeff(j,...
+                        (l-1)*FilterLength+1:l*FilterLength)] = ...
+                        One_Tap_Wiener_Filter(Rx(j,...
+                        (l-1)*FilterLength+1:l*FilterLength), ...
+                        Tx_QPSK(j,...
+                        (l-1)*FilterLength+1:l*FilterLength), ...
+                        Noiseless_Rx(j,...
+                        (l-1)*FilterLength+1:l*FilterLength), noiseVar);
+                    WienerError(j,...
+                        (l-1)*FilterLength+1:l*FilterLength,k) = ...
+                        WienerRx(j,...
+                        (l-1)*FilterLength+1:l*FilterLength)-...
+                        Tx_QPSK(j,(l-1)*FilterLength+1:l*FilterLength);
     %                     WienerMSE(j) = var(WienerError(j,:));
-                    end
                 end
-                
-%                 Zero forcing Solution
-%                 ZeroForcing_W = mean(Rx./Tx_QPSK,2);
-                
-%                 WienerMSE = WienerMSE(1:size(Rx,1),1);
-%             end
-    %         size(Rx)
-        %         figure();
-        %         scatterplot(reshape(Rx, [FFTLength*SymbolsPerFrame,1]));
+            end
+            
             % Equaliser
             e = zeros(FFTLength, size(Rx, 2)); % Initialising e (not necessary but a small optimisation)
-%             H_hat = zeros(FFTLength, 1); % Initialise the channel estimate to all zeros
-%             H_hat = conj(1./(Rx(:,1)./Tx_QPSK(:,1)));
-
-            H_hat = Rx(:,1)./Tx_QPSK(:,1);
-%             H_hat = conj(1./H_hat);
-            H_hat = conj(((conj(H_hat).*H_hat+ (1./(10^(snr/10))) ).^-1).*conj(H_hat));
-            
-%             H_hat = conj(mean(1./(Rx(:,1:3)./Tx_QPSK(:,1:3)),2));
-%             H_hat = conj(((conj(H_hat)*H_hat.').' + noiseVar./B.*eye(size((conj(H_hat)*H_hat.').')))^(-1)*conj(H_hat));
-            
+            H_hat = zeros(FFTLength,FilterLength);
+%             for j = 1:size(Rx,1)
+%                 [~, H_hat(j,:)] = ...
+%                     One_Tap_Wiener_Filter(Rx(j,1:FilterLength), ...
+%                     Tx_QPSK(j,1:FilterLength), ...
+%                     Noiseless_Rx(j,1:FilterLength), noiseVar);
+%             end
+            H_hat = mean(H_hat,2);
             for j = 1:size(Rx,2)
                 if(~decision_directed)
                     % One tap LMS
                     e(:,j) = Tx_QPSK(:,j) - conj(H_hat).*Rx(:,j);
-%                     H_hat = H_hat + (mu./(NLMS_Numerical_Conditioning_Constant+abs(Rx(:,j)).^2)).*Rx(:,j).*conj(e(:,j));
-                    H_hat = H_hat + mu.*Rx(:,j).*conj(e(:,j));
-                    Rx(:,j) = conj(H_hat).*Rx(:,j);
+%                     H_hat = H_hat + (muNLMS./...
+%                         (NLMS_Numerical_Conditioning_Constant+...
+%                         abs(Rx(:,j)).^2)).*Rx(:,j).*conj(e(:,j));
+                    H_hat = H_hat + muLMS.*Rx(:,j).*conj(e(:,j));
+                    Rx(:,j) = conj(H_hat).*Rx(:,j); 
                     if(j == training_symbols)
                         decision_directed = ~decision_directed;
                     end
                 else
                     equalisedRx = conj(H_hat).*Rx(:,j);
-        %             scatterplot(Rx(:,j));
                     dd = qpskDemod(equalisedRx);
                     dd = QPSKmod(dd);
-        %                 figure();
-        %                 scatterplot(dd);
                     e(:, j) = dd - equalisedRx;
-                    H_hat = H_hat + mu.*Rx(:,j).*conj(e(:,j));
+                    H_hat = H_hat + muLMS.*Rx(:,j).*conj(e(:,j));
                     % NLMS
-%                     H_hat = H_hat + (mu./(NLMS_Numerical_Conditioning_Constant+abs(Rx(:,j)).^2)).*Rx(:,j).*conj(e(:,j));
+%                     H_hat = H_hat + (muNLMS./...
+%                         (NLMS_Numerical_Conditioning_Constant+...
+%                         abs(Rx(:,j)).^2)).*Rx(:,j).*conj(e(:,j));
                     Rx(:,j) = equalisedRx;
                 end
                 if (MSE_flag == 1)
@@ -218,6 +210,8 @@ for m = 1:M
             if (MSE_flag == 0)
                 Rx = qpskDemod(reshape(Rx, [FFTLength*SymbolsPerFrame 1]));
                 berTmpVec(m,k,i) = sum(Rx ~= x1)/frameSize;
+                WienerRx1 = qpskDemod(reshape(WienerRx, [FFTLength*SymbolsPerFrame 1]));
+                WienerBERTmpVec(m,k,i) = sum(WienerRx1 ~= x1)/frameSize;
             end
         end
     %     if ( k < 15 )
@@ -228,22 +222,29 @@ for m = 1:M
 end
 if (MSE_flag == 0)
     berVec = mean(mean(berTmpVec,3),2);
-    semilogy(EbNoVec, berVec);
+    WienerBERVec = mean(mean(WienerBERTmpVec,3),2);
+    semilogy(EbNoVec, berVec, '-*');
+    hold on;
+    semilogy(EbNoVec,WienerBERVec, '--o');
+    BERTheory = berfading(EbNoVec, 'psk', 4,1);
+    semilogy(EbNoVec,BERTheory, '--x');
     xlabel("E_b/N_0");
     ylabel("BER");
     title("BER vs E_b/N_0 for a Rayleigh fading channel");
+    legend('NLMS', 'Wiener Solution', 'Theoretical Fading Solution');
 else
     MeanSquareError = mean((MeanSquareError.*conj(MeanSquareError)),3);
-    WienerMSE = mean(mean(WienerError.*conj(WienerError),2),3);
+%     WienerMSE = mean(mean(WienerError.*conj(WienerError),2),3);
+    WienerMSE = mean(WienerError.*conj(WienerError),3);
     for i = 1:1
         figure();
         hold on;
         plot(MeanSquareError(i,:));
-        plot([1,length(MeanSquareError(i,:))], [WienerMSE(i), WienerMSE(i)],'r');
+        plot(1:size(MeanSquareError,2),WienerMSE(i,:),'r');
         xlabel("OFDM Symbols")
         ylabel("Mean Square Error")
         title("Mean Square Error vs No. of Symbols");
     end
-
+    legend('NLMS', 'Wiener Solution');
 end
 
